@@ -41,6 +41,7 @@ parser.add_argument('--relation-type', type=str, default='binary',
 parser.add_argument('--dataset', type=str, default='pixels',
                     help='what dataset to train on. options: pixels, state_desc (default: pixels)')
 
+#check for cuda
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -51,6 +52,7 @@ if args.cuda:
 
 summary_writer = SummaryWriter()
 
+#select model based on arguments
 if args.model=='CNN_MLP': 
   model = CNN_MLP(args)
 elif args.model=='CNN_RN_SOC':
@@ -59,22 +61,22 @@ elif args.model=='RN_state_desc':
   model = RN_state_desc(args)
 else:
   model = RN(args)
-  
+
 model_dirs = './model'
 bs = args.batch_size
 
+#create input tensor based on dataset to train on
 if args.dataset == 'pixels':
     input_obj = torch.FloatTensor(bs, 3, 75, 75)
 else:
+    #state description tensor containing 6 objects and 7 features
     input_obj = torch.FloatTensor(bs, 6, 7)
 
 input_qst = torch.FloatTensor(bs, 18)
 label = torch.LongTensor(bs)
 
 if args.cuda:
-
     model.cuda()
-    #model.activate_cuda()
     input_obj = input_obj.cuda()
     input_qst = input_qst.cuda()
     label = label.cuda()
@@ -86,30 +88,35 @@ label = Variable(label)
 def tensor_data(data, i):
     if args.dataset == "pixels":
         obj = torch.from_numpy(np.asarray(data[0][bs*i:bs*(i+1)]))
-    else:
+    else: #training on state description
         batch_data = data[0][bs*i:bs*(i+1)]
+        #convert state description matrix into form usable by model
         new_data = []
         for matrix in batch_data:
+            #for each state description matrix in batch
             new_matrix = []
             for row in matrix:
+                #for each object in current matrix
                 new_row = []
                 for feature in row:
+                    #for each feature in object, convert to value
                     if isinstance(feature, np.ndarray):
+                        #append the x & y coordinates into our features list
                         new_row.extend(coordinate for coordinate in feature)
                     elif isinstance(feature, tuple):
+                        #append the RGB values into our features list
                         new_row.extend(colorval/255 for colorval in feature)
                     elif isinstance(feature, str):
+                        #append 1 if shape is rectangle, 0 if circle
                         if feature == 'rectangle': new_row.append(1)
                         else: new_row.append(0)
                     else:
+                        #size feature
                         new_row.append(feature)
                 new_matrix.append(new_row)
             new_data.append(new_matrix)
         obj = torch.from_numpy(np.asarray(new_data))
                     
-
-
-    
     qst = torch.from_numpy(np.asarray(data[1][bs*i:bs*(i+1)]))
     ans = torch.from_numpy(np.asarray(data[2][bs*i:bs*(i+1)]))
 
@@ -261,7 +268,8 @@ def test(epoch, ternary, rel, norel):
 def load_data():
     print('loading data...')
     dirs = './data'
-
+    
+    #load dataset to train on based on arguments passed in
     if args.dataset == 'pixels':
         fname = 'sort-of-clevr.pickle'
     else:
@@ -303,8 +311,6 @@ def load_data():
 
 ternary_train, ternary_test, rel_train, rel_test, norel_train, norel_test = load_data()
 
-
-
 try:
     os.makedirs(model_dirs)
 except:
@@ -318,10 +324,8 @@ if args.resume:
         checkpoint = torch.load(filename)
         model.load_state_dict(checkpoint)
         print('==> loaded checkpoint {}'.format(filename))
-
-test_acc_ternary, test_acc_binary, test_acc_unary = test(
-            1, ternary_test, rel_test, norel_test)
-
+test(1, ternary_test, rel_test, norel_test)
+"""
 with open(f'./{args.model}_{args.seed}_log.csv', 'w') as log_file:
     csv_writer = csv.writer(log_file, delimiter=',')
     csv_writer.writerow(['epoch', 'train_acc_ternary', 'train_acc_rel',
@@ -338,3 +342,4 @@ with open(f'./{args.model}_{args.seed}_log.csv', 'w') as log_file:
         csv_writer.writerow([epoch, train_acc_ternary, train_acc_binary,
                          train_acc_unary, test_acc_ternary, test_acc_binary, test_acc_unary])
         model.save_model(epoch)
+"""

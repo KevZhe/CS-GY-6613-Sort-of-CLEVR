@@ -70,11 +70,13 @@ def build_dataset():
             end = (center[0]+size, center[1]+size)
             cv2.rectangle(img, start, end, color, -1)
             objects.append((color_id,center,'r'))
+            #add our state description row for current object
             state_desc.append([center, color, "rectangle", size])
         else:
             center_ = (center[0], center[1])
             cv2.circle(img, center_, size, color, -1)
             objects.append((color_id,center,'c'))
+            #add our state description row for current object
             state_desc.append([center, color, "circle", size])
 
 
@@ -263,7 +265,9 @@ def build_dataset():
     norelations = (norel_questions, norel_answers)
     
     img = img/255.
+    #dataset for pixels
     dataset = (img, ternary_relations, binary_relations, norelations)
+    #dataset for state descriptions
     dataset_state_desc = (state_desc, ternary_relations, binary_relations, norelations)
     return dataset, dataset_state_desc
 
@@ -277,8 +281,8 @@ for _ in range(test_size):
     dataset, dataset_state_desc = build_dataset()
     test_datasets.append(dataset)
     test_state_desc.append(dataset_state_desc)
-print('building train datasets...')
 
+print('building train datasets...')
 for _ in range(train_size):
     dataset, dataset_state_desc = build_dataset()
     train_datasets.append(dataset)
@@ -287,7 +291,6 @@ for _ in range(train_size):
 
 #img_count = 0
 #cv2.imwrite(os.path.join(dirs,'{}.png'.format(img_count)), cv2.resize(train_datasets[0][0]*255, (512,512)))
-
 
 print('saving datasets...')
 

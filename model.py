@@ -237,15 +237,20 @@ class CNN_MLP(BasicModel):
         
         return self.fcout(x_)
 
+
+
+#Fully connected output for Sort-of-CLEVR model
 class FCOutputModel_SOC(nn.Module):
     def __init__(self):
         super(FCOutputModel_SOC, self).__init__()
-
+        #latter 3 layer of 4-layer MLP for f
         self.fc2 = nn.Linear(1000, 500)
         self.fc3 = nn.Linear(500, 100)
         self.fc4 = nn.Linear(100, 10)
 
     def forward(self, x):
+
+        #ReLU non-linearities
         x = self.fc2(x)
         x = F.relu(x)
         x = self.fc3(x)
@@ -254,13 +259,11 @@ class FCOutputModel_SOC(nn.Module):
         return F.log_softmax(x, dim=1)
 
 
-#Convolutional Input for Sort-Of-Clevr model
+#Convolutional Input for Sort-Of-CLEVR model
 class ConvInputModel_SOC(nn.Module):
     def __init__(self):
         super(ConvInputModel_SOC, self).__init__()
-        """
-        Four convolutional layers with 32, 64, 128, and 256 kernels
-        """
+        #Four convolutional layers with 32, 64, 128, and 256 kernels
         self.conv1 = nn.Conv2d(3, 32, 3, stride=2, padding=1)
         self.batchNorm1 = nn.BatchNorm2d(32)
         self.conv2 = nn.Conv2d(32, 64, 3, stride=2, padding=1)
@@ -298,7 +301,11 @@ class CNN_RN_SOC(BasicModel):
         self.conv = ConvInputModel_SOC()
         
         self.relation_type = args.relation_type
-        
+
+        """ 
+        g
+        4-layer MLP of 2000 units each
+        """
         if self.relation_type == 'ternary':
             ##(number of filters per object+coordinate of object)*3+question vector
             self.g_fc1 = nn.Linear((256+2)*3+18, 2000)
@@ -310,8 +317,15 @@ class CNN_RN_SOC(BasicModel):
         self.g_fc3 = nn.Linear(2000, 2000)
         self.g_fc4 = nn.Linear(2000, 2000)
 
+        """
+        f
+        4-layer MLP of 2000, 1000, 500, and 100 units with ReLU non-linearities
+        """
         self.f_fc1 = nn.Linear(2000, 1000)
+        self.fcout = FCOutputModel_SOC()
 
+
+        #coordinate tensors
         self.coord_oi = torch.FloatTensor(args.batch_size, 2)
         self.coord_oj = torch.FloatTensor(args.batch_size, 2)
         if args.cuda:
@@ -334,68 +348,45 @@ class CNN_RN_SOC(BasicModel):
         self.coord_tensor.data.copy_(torch.from_numpy(np_coord_tensor))
 
 
-        self.fcout = FCOutputModel_SOC()
+
         
         self.optimizer = optim.Adam(self.parameters(), lr=args.lr)
 
 
     def forward(self, img, qst):
+        
+        x = self.conv(img) ## x = (64 x 256 x 5 x 5)
 
-        x = self.conv(img) ## x = (64 x 24 x 5 x 5)
         """g"""
         mb = x.size()[0]
         n_channels = x.size()[1]
         d = x.size()[2]
-        # x_flat = (64 x 25 x 24)
+
+        # x_flat = (64 x 25 x 256)
         x_flat = x.view(mb,n_channels,d*d).permute(0,2,1)
+
         # add coordinates
         x_flat = torch.cat([x_flat, self.coord_tensor],2)
         
 
-        if self.relation_type == 'ternary':
-            # add question everywhere
-            qst = torch.unsqueeze(qst, 1) # (64x1x18)
-            qst = qst.repeat(1, 25, 1) # (64x25x18)
-            qst = torch.unsqueeze(qst, 1)  # (64x1x25x18)
-            qst = torch.unsqueeze(qst, 1)  # (64x1x1x25x18)
+        qst = torch.unsqueeze(qst, 1) # (64x1x18)
+        qst = qst.repeat(1, 25, 1) # (64x25x18)
+        qst = torch.unsqueeze(qst, 2) # (64x25x1x18)
 
-            # cast all triples against each other
-            x_i = torch.unsqueeze(x_flat, 1)  # (64x1x25x26)
-            x_i = torch.unsqueeze(x_i, 3)  # (64x1x25x1x26)
-            x_i = x_i.repeat(1, 25, 1, 25, 1)  # (64x25x25x25x26)
-            
-            x_j = torch.unsqueeze(x_flat, 2)  # (64x25x1x26)
-            x_j = torch.unsqueeze(x_j, 2)  # (64x25x1x1x26)
-            x_j = x_j.repeat(1, 1, 25, 25, 1)  # (64x25x25x25x26)
+        # cast all pairs against each other
+        x_i = torch.unsqueeze(x_flat, 1)  # (64x1x25x256+2)
+        x_i = x_i.repeat(1, 25, 1, 1)  # (64x25x25x256+2)
+        x_j = torch.unsqueeze(x_flat, 2)  # (64x25x1x256+2)
+        x_j = torch.cat([x_j, qst], 3) # (64x25x1x256+2+18)
+        x_j = x_j.repeat(1, 1, 25, 1)  # (64x25x25x256+2+18)
 
-            x_k = torch.unsqueeze(x_flat, 1)  # (64x1x25x26)
-            x_k = torch.unsqueeze(x_k, 1)  # (64x1x1x25x26)
-            x_k = torch.cat([x_k, qst], 4)  # (64x1x1x25x26+18)
-            x_k = x_k.repeat(1, 25, 25, 1, 1)  # (64x25x25x25x26+18)
+        # concatenate all together
+        x_full = torch.cat([x_i,x_j],3) # (64x25x25x2*(256+2+18)) = (64x25x25x534)
 
-            # concatenate all together
-            x_full = torch.cat([x_i, x_j, x_k], 4)  # (64x25x25x25x3*26+18)
+        # reshape for passing through network
+        x_ = x_full.view(mb * (d * d) * (d * d), 534)  # (64*25*25x2*256*18) = (40.000, 534)
 
-            # reshape for passing through network
-            x_ = x_full.view(mb * (d * d) * (d * d) * (d * d), 792)  # (64*25*25*25x3*26+18) = (1.000.000, 96)
-        else:
-            # add question everywhere
-            qst = torch.unsqueeze(qst, 1)
-            qst = qst.repeat(1, 25, 1)
-            qst = torch.unsqueeze(qst, 2)
-
-            # cast all pairs against each other
-            x_i = torch.unsqueeze(x_flat, 1)  # (64x1x25x26+18)
-            x_i = x_i.repeat(1, 25, 1, 1)  # (64x25x25x26+18)
-            x_j = torch.unsqueeze(x_flat, 2)  # (64x25x1x26+18)
-            x_j = torch.cat([x_j, qst], 3)
-            x_j = x_j.repeat(1, 1, 25, 1)  # (64x25x25x26+18)
-            
-            # concatenate all together
-            x_full = torch.cat([x_i,x_j],3) # (64x25x25x2*26+18)
-            # reshape for passing through network
-            x_ = x_full.view(mb * (d * d) * (d * d), 534)  # (64*25*25x2*26*18) = (40.000, 70)
-            
+        #g MLP
         x_ = self.g_fc1(x_)
         x_ = F.relu(x_)
         x_ = self.g_fc2(x_)
@@ -405,15 +396,13 @@ class CNN_RN_SOC(BasicModel):
         x_ = self.g_fc4(x_)
         x_ = F.relu(x_)
         
-        # reshape again and sum
-        if self.relation_type == 'ternary':
-            x_g = x_.view(mb, (d * d) * (d * d) * (d * d), 2000)
-        else:
-            x_g = x_.view(mb, (d * d) * (d * d), 2000)
+        #reshape for passing into f
+        x_g = x_.view(mb, (d * d) * (d * d), 2000)
 
+        #element wise sum for passing into f
         x_g = x_g.sum(1).squeeze()
         
-        """f"""
+        """f MLP """
         x_f = self.f_fc1(x_g)
         x_f = F.relu(x_f)
 
@@ -422,21 +411,28 @@ class CNN_RN_SOC(BasicModel):
     def activate_cuda(self):
         self.on_gpu = True
 
+
 #Relational network for training via state description
 class RN_state_desc(BasicModel):
     def __init__(self, args):
         super(RN_state_desc, self).__init__(args, 'RN_state_desc')
 
-        ##(number of filters per object+coordinate of object)*2+question vector
+        """
+        g
+        4 layer MLP of 512 units
+        """
         self.g_fc1 = nn.Linear(32, 512)
-
         self.g_fc2 = nn.Linear(512, 512)
         self.g_fc3 = nn.Linear(512, 512)
         self.g_fc4 = nn.Linear(512, 512)
 
+        """
+        f 
+        3 layer MLP of 512, 256, and 100 units
+        """
         self.f_fc1 = nn.Linear(512, 512)
-        self.f_fc2 = nn.Linear(256, 100)
-        self.f_fc3 = nn.Linear(100, 10)
+        self.f_fc2 = nn.Linear(512, 1024)
+        self.f_fc3 = nn.Linear(1024, 10)
 
         self.optimizer = optim.Adam(self.parameters(), lr=args.lr)
 
@@ -450,23 +446,25 @@ class RN_state_desc(BasicModel):
         
         
         # add question everywhere
-        qst = torch.unsqueeze(qst, 1)
-        qst = qst.repeat(1, 6, 1)
-        qst = torch.unsqueeze(qst, 2)
+        qst = torch.unsqueeze(qst, 1) # (64x1x18)
+        qst = qst.repeat(1, 6, 1) # (64x6x18)
+        qst = torch.unsqueeze(qst, 2) # (64x6x1x18)
+
 
         # cast all pairs against each other
-        x_i = torch.unsqueeze(x_flat, 1)  # (64x1x25x26+18)
-        x_i = x_i.repeat(1, 6, 1, 1)  # (64x25x25x26+18)
-        x_j = torch.unsqueeze(x_flat, 2)  # (64x25x1x26+18)
-        x_j = torch.cat([x_j, qst], 3)
-        x_j = x_j.repeat(1, 1, 6, 1)  # (64x25x25x26+18)
+        x_i = torch.unsqueeze(x_flat, 1)  # (64x1x6x7)
+        x_i = x_i.repeat(1, 6, 1, 1)  # (64x6x6x7)
+        x_j = torch.unsqueeze(x_flat, 2)  # (64x6x1x7) 
+        x_j = torch.cat([x_j, qst], 3) # (64x6x1x7+18)
+        x_j = x_j.repeat(1, 1, 6, 1)  # (64x6x6x7+18)
+
             
         # concatenate all together
-        x_full = torch.cat([x_i,x_j],3) # (64x25x25x2*26+18)
+        x_full = torch.cat([x_i,x_j],3) # (64x6x6x2*7+18)
 
         # reshape for passing through network
-        x_ = x_full.view(mb,d*d,32)  # (64*25*25x2*26*18) = (40.000, 70)
-        
+        x_ = x_full.view(mb*d*d,32)  # (64*(6*6)x2*7+18) = (2304, 32)
+
         """g"""
         x_ = self.g_fc1(x_)
         x_ = F.relu(x_)
@@ -477,18 +475,19 @@ class RN_state_desc(BasicModel):
         x_ = self.g_fc4(x_)
         x_ = F.relu(x_)
         
-
+        #reshape for network
         x_g = x_.view(mb,d*d,512)
-
+        
+        #element wise sum
         x_g = x_g.sum(1).squeeze()
         
         """f"""
         x_f = self.f_fc1(x_g)
         x_f = F.relu(x_f)
-        x_f = self.g_fc2(x_f)
+        x_f = self.f_fc2(x_f)
         x_f = F.relu(x_f)
         x_f = F.dropout(x_f, p = 0.02)
-        x_f = self.g_fc3(x_f)
+        x_f = self.f_fc3(x_f)
 
 
         return F.log_softmax(x_f, dim=1)
