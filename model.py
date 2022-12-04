@@ -238,7 +238,12 @@ class CNN_MLP(BasicModel):
         return self.fcout(x_)
 
 
-
+    """
+    Integrate features after multiple convolutions then perform normalization, 
+    and output a probability for each classification situation; the subsequent 
+    classifier can be classified according to the probability obtained by fully connected outputs.
+    Adding a fully connected layer to learn nonlinear combination features in an easy way.
+    """
 #Fully connected output for Sort-of-CLEVR model
 class FCOutputModel_SOC(nn.Module):
     def __init__(self):
@@ -249,7 +254,10 @@ class FCOutputModel_SOC(nn.Module):
         self.fc4 = nn.Linear(100, 10)
 
     def forward(self, x):
-
+        """ 
+        Full connection
+        ReLU non-linearities
+        """
         #ReLU non-linearities
         x = self.fc2(x)
         x = F.relu(x)
