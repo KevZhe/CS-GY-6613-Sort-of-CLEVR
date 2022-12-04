@@ -15,12 +15,12 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch.autograd import Variable
 from torch.backends import cudnn
-from model import RN, CNN_MLP, CNN_RN_SOC, RN_state_desc
+from model import CNN_MLP, CNN_RN_SOC, RN_state_desc
 
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch Relational-Network sort-of-CLVR Example')
-parser.add_argument('--model', type=str, choices=['RN', 'CNN_MLP', "CNN_RN_SOC", "RN_state_desc"], default='RN', 
+parser.add_argument('--model', type=str, choices=['CNN_MLP', "CNN_RN_SOC", "RN_state_desc"], default='CNN_RN_SOC', 
                     help='resume from model stored')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
@@ -55,12 +55,12 @@ summary_writer = SummaryWriter()
 #select model based on arguments
 if args.model=='CNN_MLP': 
   model = CNN_MLP(args)
-elif args.model=='CNN_RN_SOC':
-  model = CNN_RN_SOC(args)
 elif args.model=='RN_state_desc':
   model = RN_state_desc(args)
 else:
-  model = RN(args)
+  model = CNN_RN_SOC(args)
+
+
 
 model_dirs = './model'
 bs = args.batch_size
@@ -324,8 +324,7 @@ if args.resume:
         checkpoint = torch.load(filename)
         model.load_state_dict(checkpoint)
         print('==> loaded checkpoint {}'.format(filename))
-test(1, ternary_test, rel_test, norel_test)
-"""
+
 with open(f'./{args.model}_{args.seed}_log.csv', 'w') as log_file:
     csv_writer = csv.writer(log_file, delimiter=',')
     csv_writer.writerow(['epoch', 'train_acc_ternary', 'train_acc_rel',
@@ -342,4 +341,3 @@ with open(f'./{args.model}_{args.seed}_log.csv', 'w') as log_file:
         csv_writer.writerow([epoch, train_acc_ternary, train_acc_binary,
                          train_acc_unary, test_acc_ternary, test_acc_binary, test_acc_unary])
         model.save_model(epoch)
-"""

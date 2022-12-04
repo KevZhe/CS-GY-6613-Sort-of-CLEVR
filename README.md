@@ -56,6 +56,26 @@ This is passed into $g_{\theta}$, which we defined as a 4-layer MLP consisting o
 
 ## **Dealing with State Description**
 As we are not dealing with images in state descriptions, we no longer need any of the visual processing that was needed for Sort-of-CLEVR from pixels. Thus, we can scrap the CNN input. This is also due the fact that state descriptions are, in essence, like object representation, which means we can directly plug them into the RN. We also have to make the objects in the matrix an input acceptable by the network. To do this, we create a new matrix with each column being an value represenation of the original feature. The resulting matrix have 2 features corresponding to x and y coordinates, 3 features for RGB values, 1 feature describing shape (binary in this case), and 1 feature describing size. The resulting matrix is of shape (6,7), and describes the state of the image just as an image would. This matrix is passed into the RN and the same process of pairing objects with other objects along with a question embedding is done. For this task, we used a 4-layer MLP of 512 units each for $g_{\theta}$ with ReLU non-linearities. For $f_{\phi}$, we used a 3-layer MLP of 512, 1024 (with 2% dropout), and 10 units with ReLU non linearities. A final softmax layer is applied for answers. The model was trained using a mini-batch size of 64. 
+## **How to Run*** 
+To generate Sort-of-CLEVR dataset & state descriptions
+
+	$ python sort_of_clevr_generator.py 
+
+To train binary CNN_RN model
+
+	$ python main.py 
+
+To train binary state description model
+
+	$ python main.py --model RN_state_desc --dataset state_desc
+
+To resume pretrained CNN_RN model
+
+    $ python main.py --model CNN_RN_SOC --resume epoch_22_CNN_RN_SOC.pth
+
+To resume pretrained state description model
+
+    $ python main.py --model RN_state_desc --resume epoch_80_RN_statedesc.pth --dataset state_desc
 
 ## **Performance**
 | | CNN + RN (22th epoch) | State Descriptions (80th epoch) |
