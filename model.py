@@ -213,9 +213,9 @@ class CNN_RN_SOC(BasicModel):
         """
         #expand our question tensor in the 2nd dimension to be repeatable
         qst = torch.unsqueeze(qst, 1) # (64x1x18)
-        #repeat 25 times in the 2nd dimension so it can be added to all pairs
+        #repeat 25 times in the 2nd dimension so it can be added to all pairs (25 objects)
         qst = qst.repeat(1, 25, 1) # (64x25x18)
-        #expand in 3rd dimension so it retains question shape
+        #expand in 3rd dimension so it can be added to features later
         qst = torch.unsqueeze(qst, 2) # (64x25x1x18)
 
         """
@@ -225,18 +225,18 @@ class CNN_RN_SOC(BasicModel):
         x_i = torch.unsqueeze(x_flat, 1)  # (64x1x25x256+2)
         #repeat 25 times in the 2nd dimension (objects xi)
         x_i = x_i.repeat(1, 25, 1, 1)  # (64x25x25x256+2)
-        #expand our input object in 3rd dimension to be repeatble
+        #expand our input object in 3rd dimension to be repeatable
         x_j = torch.unsqueeze(x_flat, 2)  # (64x25x1x256+2)
-        #add our question to be asked to our objects xj
+        #add our question to be asked to our objects xj's features
         x_j = torch.cat([x_j, qst], 3) # (64x25x1x256+2+18)
         #repeat 25 times in the 3rd dimension (objects xj with question)
         x_j = x_j.repeat(1, 1, 25, 1)  # (64x25x25x256+2+18)
 
         # concatenate objects xi with xj + question
-        x_full = torch.cat([x_i,x_j],3) # (64x25x25x2*(256+2+18)) = (64x25x25x534)
+        x_full = torch.cat([x_i,x_j],3) # (64x25x25x2*(256+2)+18)) = (64x25x25x534)
 
         # reshape for passing through network
-        x_ = x_full.view(mb * (d * d) * (d * d), 534)  # (64*25*25x2*256*18) = (40.000, 534)
+        x_ = x_full.view(mb * (d * d) * (d * d), 534)  # (64*25*25x2*258+18) = (40.000, 534)
         
         """g"""
 
@@ -302,21 +302,29 @@ class RN_state_desc(BasicModel):
         #dim
         d = mat.shape[1]
         
-        # add question everywhere
+        #add question everywhere
+        #expand question tensor in 1st dimension to be repeatable
         qst = torch.unsqueeze(qst, 1) # (64x1x18)
+        #repeat question tensor 6 times in 1st dimension for 6 objects
         qst = qst.repeat(1, 6, 1) # (64x6x18)
+        #expand in 3rd dimension so it can be added to features later 
         qst = torch.unsqueeze(qst, 2) # (64x6x1x18)
 
 
-        # cast all pairs against each other
+        #cast all pairs against each other
+        #expand in 2nd dimension to repeat objects xi
         x_i = torch.unsqueeze(x_flat, 1)  # (64x1x6x7)
+        #repeat 6 times in 2nd dimension (creating objects xi)
         x_i = x_i.repeat(1, 6, 1, 1)  # (64x6x6x7)
-        x_j = torch.unsqueeze(x_flat, 2)  # (64x6x1x7) 
+        #expand in 3rd dimension to repeat objects xj
+        x_j = torch.unsqueeze(x_flat, 2)  # (64x6x1x7)
+        #add our question to be asked to our objects xj's features
         x_j = torch.cat([x_j, qst], 3) # (64x6x1x7+18)
+        #repeat 6 times in the 3rd dimension (objects xj with question)
         x_j = x_j.repeat(1, 1, 6, 1)  # (64x6x6x7+18)
 
             
-        # concatenate all together
+        # concatenate all together (have all possible object pairings of xi and xj with question)
         x_full = torch.cat([x_i,x_j],3) # (64x6x6x2*7+18)
 
         # reshape for passing through network
