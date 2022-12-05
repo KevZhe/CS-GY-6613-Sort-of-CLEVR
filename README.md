@@ -8,7 +8,7 @@ In this repo, Relational Networks are tested on the Sort-of-CLEVR dataset using 
 
 ## **What are Relational Networks?**
 
-Relational networks are, in essence, a module made for neural networks that contain a structure designed for reasoning the relations between objects. Similar to how other neural network architectures such as CNNs are able deduce spatial features without explictly learning it or how RNNs are able to establish depdencies on sequential inputs, the ability to ground relationships is built into Relational networks. 
+Relational networks are, in essence, a module made for neural networks that contain a structure designed for reasoning the relations between objects. Similar to how other neural network architectures such as CNNs are able deduce spatial features without explictly learning it or how RNNs are able to establish dependencies on sequential inputs, the ability to ground relationships is built into Relational networks. 
 
 Although Relational networks can be used on their own, they are also modules that can be used in existing network architectures. This means that Relational networks can be "plugged in" to existing networks such as CNNs or LSTMs by taking in as input the object embeddings of such networks in order to solve problems that inherently rely on relational reasoning.  
 
