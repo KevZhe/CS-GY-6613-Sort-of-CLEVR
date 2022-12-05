@@ -311,6 +311,7 @@ def load_data():
 
 ternary_train, ternary_test, rel_train, rel_test, norel_train, norel_test = load_data()
 
+
 try:
     os.makedirs(model_dirs)
 except:
@@ -324,6 +325,9 @@ if args.resume:
         checkpoint = torch.load(filename)
         model.load_state_dict(checkpoint)
         print('==> loaded checkpoint {}'.format(filename))
+
+#print("Test Accuracy with current model:")
+#test(0, ternary_test, rel_test, norel_test)
 
 with open(f'./{args.model}_{args.seed}_log.csv', 'w') as log_file:
     csv_writer = csv.writer(log_file, delimiter=',')
